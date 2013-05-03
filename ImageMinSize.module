@@ -1,0 +1,111 @@
+<?php
+
+/**
+ * ImageMinSize
+ * Image minimum width and height
+ *
+ * @athor Soma
+ *
+ * ProcessWire 2.x
+ * Copyright (C) 2010 by Ryan Cramer
+ * Licensed under GNU/GPL v2, see LICENSE.TXT
+ *
+ * http://www.processwire.com
+ * http://www.ryancramer.com
+ *
+ */
+
+class ImageMinSize extends WireData implements Module {
+
+    /**
+     * getModuleInfo is a module required by all modules to tell ProcessWire about them
+     *
+     * @return array
+     *
+     */
+    public static function getModuleInfo() {
+
+        return array(
+            'title' => 'ImageMinSize',
+            'version' => 1,
+            'summary' => 'Add min width and height setting to image fields.',
+            'href' => 'http://www.processwire.com',
+            'singular' => true,
+            'autoload' => true,
+            );
+    }
+
+    /**
+     * Initialize the module
+     *
+     * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
+     * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
+     *
+     */
+    public function init() {
+        $this->addHookAfter('InputfieldFile::fileAdded', $this, 'minSizeCheck');
+        $this->addHookAfter('InputfieldImage::getConfigInputfields', $this, 'addConfig');
+
+    }
+
+    public function minSizeCheck(HookEvent $event){
+        $field = $event->object;
+        $inputfield = $this->fields->get($field->name);
+        $image = $event->argumentsByName("pagefile");
+        $errors = array();
+        $error = false;
+
+        if($inputfield->minWidth && $inputfield->minHeight){
+            if(($image->width < $inputfield->minWidth) || ($image->height < $inputfield->minHeight)){
+                $error = true;
+                $error_message = sprintf($this->_('Image must have min width and height of %1$s x %2$s px'),$inputfield->minWidth,$inputfield->minHeight);
+            }
+        } else if($inputfield->minWidth){
+            if($image->width < $inputfield->minWidth){
+                $error = true;
+                $error_message = sprintf($this->_('Image must have min width of $%s px'),$inputfield->minWidth);
+            }
+        } else if($inputfield->minHeight){
+            if($image->height < $inputfield->minHeight){
+                $error = true;
+                $error_message = sprintf($this->_('Image must have min height of %s px'),$inputfield->minHeight);
+            }
+        }
+
+        if(!$error) return;
+        if($this->config->ajax){
+            $image->unlink();
+            $errors[] = array('error'=>true, 'message' => $error_message);
+            echo json_encode($errors);
+            exit();
+        } else {
+            $field->processInputDeleteFile($image);
+            $this->error($error_message);
+        }
+    }
+
+    public function addConfig(HookEvent $event){
+        $field = $event->object;
+        $inputfield = $this->fields->get($field->name);
+        $fieldwrapper = $event->return;
+
+        $wrapper =$this->modules->get("InputfieldFieldset");
+        $wrapper->label = $this->_("Min Image Dimensions");
+        $wrapper->description = $this->_("If minimum width and/or height are set, images not matching the requirements will not be saved. To setup an exact image dimension validation, set both max and min dimensions to match each other.");
+
+        $f = $this->modules->get("InputfieldInteger");
+        $f->attr("name", "minWidth");
+        $f->label = $this->_("Minimum width in pixel");
+        $f->attr("value", $inputfield->minWidth);
+        $wrapper->append($f);
+
+        $f = $this->modules->get("InputfieldInteger");
+        $f->attr("name", "minHeight");
+        $f->label = $this->_("Minimum height in pixel");
+        $f->attr("value", $inputfield->minHeight);
+        $wrapper->append($f);
+
+        $event->return = $fieldwrapper->append($wrapper);
+    }
+
+}
