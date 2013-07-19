@@ -27,7 +27,7 @@ class ImageMinSize extends WireData implements Module {
 
         return array(
             'title' => 'ImageMinSize',
-            'version' => 1,
+            'version' => 100,
             'summary' => 'Add min width and height setting to image fields.',
             'href' => 'http://www.processwire.com',
             'singular' => true,
